@@ -19,7 +19,7 @@ TITULO_APP = "Inteligencia Artificial"
 COLOR_PRIMARIO = "#7a1f1f"
 COLOR_ACENTO = "#d4af37"
 
-st.set_page_config(page_title=TITULO_APP, page_icon="🧠", layout="wide")
+st.set_page_config(page_title=TITULO_APP, page_icon="🧠", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown(
     f"""
@@ -38,6 +38,7 @@ st.markdown(
     .doc p {{text-align: justify; white-space: pre-wrap; margin: 0 0 .7rem 0;
             line-height: 1.55;}}
     .doc-fondo {{background: #fff; color: #111; border-radius: 10px; padding: 24px 32px;}}
+    [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] {{display: none;}}
     </style>
     """,
     unsafe_allow_html=True,
@@ -174,7 +175,7 @@ def seccion_portada():
     _, centro, _ = st.columns([1, 1, 1])
     with centro:
         mostrar_imagen(os.path.join(IMG, "portada.png"), width="stretch")
-    st.caption("Elige una sección en el menú de la izquierda.")
+    st.caption("Elige una sección en el menú de arriba o usa el buscador.")
 
 
 def seccion_concepto():
@@ -295,40 +296,46 @@ TITULOS = [s[1] for s in SECCIONES]
 
 
 # ----------------------------------------------------------------------------
-# Navegación y buscador (barra lateral)
+# Navegación: barra superior (botón de inicio + buscador desplegable)
 # ----------------------------------------------------------------------------
+PLACEHOLDER = "Buscar o elegir una sección..."
+
 if "seccion" not in st.session_state:
     st.session_state["seccion"] = TITULOS[0]
 
+# Opciones del desplegable: primero las secciones, luego sus sub-opciones
+OPCIONES = {}
+for _clave, _titulo, _f, _clave_sub, _subs in SECCIONES[1:]:
+    OPCIONES[_titulo] = (_titulo, None, None)
+for _clave, _titulo, _f, _clave_sub, _subs in SECCIONES:
+    for _s in _subs:
+        OPCIONES[f"{_s}   ·   {_titulo}"] = (_titulo, _clave_sub, _s)
 
-def ir_a(titulo, clave_sub=None, sub=None):
-    st.session_state["seccion"] = titulo
-    if clave_sub and sub:
-        st.session_state[clave_sub] = sub
-    st.session_state["busqueda"] = ""
+
+def ir_inicio():
+    st.session_state["seccion"] = TITULOS[0]
+    st.session_state["menu_top"] = None
 
 
-with st.sidebar:
-    st.markdown(f"### {TITULO_APP}")
-    consulta = st.text_input("Buscar", key="busqueda", placeholder="Buscar una sección o término...")
+def al_elegir():
+    eleccion = st.session_state.get("menu_top")
+    if eleccion in OPCIONES:
+        titulo, clave_sub, sub = OPCIONES[eleccion]
+        st.session_state["seccion"] = titulo
+        if clave_sub:
+            st.session_state[clave_sub] = sub
+    st.session_state["menu_top"] = None   # vuelve a mostrar el placeholder
 
-    if consulta.strip():
-        q = normalizar(consulta)
-        resultados = []
-        for _clave, titulo, _f, clave_sub, subs in SECCIONES:
-            if q in normalizar(titulo):
-                resultados.append((titulo, titulo, None, None))
-            for s in subs:
-                if q in normalizar(s):
-                    resultados.append((f"{s} · {titulo}", titulo, clave_sub, s))
-        if not resultados:
-            st.caption(f'Sin resultados para "{consulta}".')
-        for i, (texto, titulo, clave_sub, sub) in enumerate(resultados[:12]):
-            st.button(texto, key=f"res_{i}", on_click=ir_a, args=(titulo, clave_sub, sub),
-                      width="stretch")
-        st.divider()
 
-    st.radio("Secciones", TITULOS, key="seccion", label_visibility="collapsed")
+with st.container(border=True):
+    c_inicio, c_buscar = st.columns([1, 9], vertical_alignment="center")
+    with c_inicio:
+        st.button("🏠", on_click=ir_inicio, help="Inicio", width="stretch")
+    with c_buscar:
+        st.selectbox(
+            "Buscar", list(OPCIONES), index=None, key="menu_top", on_change=al_elegir,
+            placeholder=PLACEHOLDER, label_visibility="collapsed",
+        )
 
 # ----------------------------------------------------------------------------
 # Contenido
